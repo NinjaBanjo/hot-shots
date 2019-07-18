@@ -1,7 +1,6 @@
 const assert = require('assert');
 const helpers = require('./helpers/helpers.js');
 
-const closeAll = helpers.closeAll;
 const testTypes = helpers.testTypes;
 const createServer = helpers.createServer;
 const createHotShotsClient = helpers.createHotShotsClient;
@@ -10,15 +9,16 @@ describe('#errorHandling', () => {
   let server;
   let statsd;
   let ignoreErrors;
+  if (ignoreErrors) { ignoreErrors = false; }
 
-  afterEach(done => {
-    closeAll(server, statsd, ignoreErrors, () => {
-      ignoreErrors = false;
-      server = null;
-      statsd = null;
-      done();
-    });
-  });
+  // afterEach(done => {
+  //   closeAll(server, statsd, ignoreErrors, () => {
+  //     ignoreErrors = false;
+  //     server = null;
+  //     statsd = null;
+  //     done();
+  //   });
+  // });
 
   // we have some tests first outside of the normal testTypes() setup as we want to
   // test with a broken server, which is just set up with tcp
@@ -218,40 +218,39 @@ describe('#errorHandling', () => {
           });
         });
 
-        it('should re-create the socket on 107 error for type uds', (done) => {
-          const code = 107;
+        it.only('should re-create the socket on 107 error for type uds', (done) => {
           const realDateNow = Date.now;
           Date.now = () => '4857394578';
-          // emit an error, like a socket would
-          // 111 is connection refused
-          server = createServer('uds_broken', address => {
             const client = statsd = createHotShotsClient({
-              host: address.address,
-              port: address.port,
               protocol: 'uds',
+              path: './test.sock',
               udsGracefulErrorHandling: true,
               errorHandler(error) {
                 assert.ok(error);
-                assert.equal(error.code, code);
               }
             }, 'client');
             const initialSocket = client.socket;
+            client._send('fancy_counter');
             setTimeout(() => {
-              initialSocket.emit('error', { code });
               assert.ok(Object.is(initialSocket, client.socket));
-              // it should not create the socket if it breaks too quickly
-              // change time and make another error
-              Date.now = () => 4857394578 + 1000; // 1 second later
-              initialSocket.emit('error', { code });
-              setTimeout(() => {
-                // make sure the socket was re-created
-                assert.notEqual(initialSocket, client.socket);
-                // put things back
-                Date.now = realDateNow;
-                done();
-              }, 5);
+              console.log('first send before');
+              client.send('fancy_counter', {}, (ee) => {
+                console.log('first send after', ee);
+                // it should not create the socket if it breaks too quickly
+                // change time and make another error
+                Date.now = () => 4857394578 + 1000; // 1 second later
+                client.send('fancy_counter', {}, (eee) => {
+                  console.log('second send after', eee);
+                  setTimeout(() => {
+                    // make sure the socket was re-created
+                    assert.notEqual(initialSocket, client.socket);
+                    // put things back
+                    Date.now = realDateNow;
+                    done();
+                  }, 5);
+                });
+              });
             }, 5);
-          });
         });
 
         it('should re-create the socket on error for type uds with the configurable limit', (done) => {

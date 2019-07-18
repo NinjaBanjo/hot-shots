@@ -144,16 +144,8 @@ function createServer(serverType, onListening) {
       fs.unlinkSync(UDS_TEST_PATH); // eslint-disable-line no-sync
     }
 
-    server = unixDgram.createSocket('unix_dgram', buf => {
-      const metrics = buf.toString();
-      server.emit('metrics', metrics);
-      server.close();
-    });
+    server = unixDgram.createSocket('unix_dgram');
     server.on('listening', () => {
-      onListening('127.0.0.1');
-    });
-    server.on('error', (err) => {
-      console.log('uds connection failed', err);
       onListening('127.0.0.1');
     });
     server.bind(UDS_TEST_PATH);

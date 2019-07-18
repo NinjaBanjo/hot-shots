@@ -1,0 +1,4 @@
+{
+  "prettier.quoteProps": "consistent",
+  "prettier.requireConfig": true
+}
